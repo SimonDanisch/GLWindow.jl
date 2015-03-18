@@ -38,7 +38,7 @@ function Base.show(io::IO, m::MonitorProperties)
 	println(io, "dpi: ", m.dpi[1], "x", m.dpi[2])
 end
 
-immutable Screen
+type Screen
     id::Symbol
     area
     parent::Screen
