@@ -2,6 +2,24 @@ import GLFW.Window, GLFW.Monitor, GLAbstraction.update, GLAbstraction.render
 export UnicodeInput, KeyPressed, MouseClicked, MouseMoved, EnteredWindow, WindowResized
 export MouseDragged, Scrolled, Window, leftclickdown, Screen
 
+#==
+   Make debugging interface flexible
+   flagOn : on / off
+   Level (ORed bit values) :to be allocated
+   
+==#
+debugFlagOn = isdefined(:GLWindowDebugLevel)
+debugLevel  = debugFlagOn ? GLWindowDebugLevel : 0
+
+#==  Set the debug parameters; if this function is not used, GLRenderDebugLevel
+     must be set at time of package loading.
+==#
+function setDebugLevels(flagOn::Bool,level::Int)
+    global debugFlagOn
+    global debugLevel
+    debugFlagOn = flagOn
+    debugLevel  = flagOn ? level : 0
+end
 
 
 immutable MonitorProperties
@@ -38,7 +56,7 @@ function Base.show(io::IO, m::MonitorProperties)
 	println(io, "dpi: ", m.dpi[1], "x", m.dpi[2])
 end
 
-immutable Screen
+type Screen
     id::Symbol
     area
     parent::Screen
@@ -175,6 +193,14 @@ function Base.show(io::IO, m::Screen)
 		key, value = x
 		println(io, "  ", key, " => ", typeof(value))
 	end
+
+        if debugFlagOn
+            println("RenderList:")
+            map (m.renderlist) do elt
+                   println("\t", typeof(elt), "::\t", elt)
+            end
+            println("+++ end of output for ", m.id, "\n+++   +++   +++")
+        end
 end
 
 
