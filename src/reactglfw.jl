@@ -375,9 +375,17 @@ function scaling_factor(window::Rectangle{Int}, fb::Vec{2, Int})
 end
 
 
-function createwindow(name::AbstractString, w, h; debugging = false, windowhints=[(GLFW.SAMPLES, 4)])
+function createwindow(name::AbstractString, w, h; debugging = false,
+                      windowhints=[(GLFW.SAMPLES, 4)],
+                      contexthints=[(GLFW.CONTEXT_VERSION_MAJOR, 3),
+                                    (GLFW.CONTEXT_VERSION_MINOR, 3),
+                                    (GLFW.OPENGL_FORWARD_COMPAT, GL_TRUE),
+                                    (GLFW.OPENGL_PROFILE, GLFW.OPENGL_CORE_PROFILE)])
 
     for elem in windowhints
+        GLFW.WindowHint(elem...)
+    end
+    for elem in contexthints
         GLFW.WindowHint(elem...)
     end
     @osx_only begin
@@ -386,11 +394,6 @@ function createwindow(name::AbstractString, w, h; debugging = false, windowhints
             debugging = false
         end
     end
-
-    GLFW.WindowHint(GLFW.CONTEXT_VERSION_MAJOR, 3)
-    GLFW.WindowHint(GLFW.CONTEXT_VERSION_MINOR, 3)
-    GLFW.WindowHint(GLFW.OPENGL_FORWARD_COMPAT, GL_TRUE)
-    GLFW.WindowHint(GLFW.OPENGL_PROFILE, GLFW.OPENGL_CORE_PROFILE)
 
     GLFW.WindowHint(GLFW.OPENGL_DEBUG_CONTEXT, Cint(debugging))
     window = GLFW.CreateWindow(w, h, name)
