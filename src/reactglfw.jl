@@ -359,10 +359,35 @@ function scaling_factor(window::SimpleRectangle{Int}, fb::Vec{2, Int})
     Vec{2, Float64}(fb[1] / window.w, fb[2] / window.h)
 end
 
+# Setup default on multiple platforms
+if OS_NAME == :Linux
+    # We set these differently on Linux since Ubuntu 14.04 and Debian
+    # Jessie ship with Mesa <= 10.3 and only support up to OpenGL 3.0
+    # for Intel hardware, so we specify a lesser lower-bound.
+    # Likewise since this is below OpenGL 3.2 we need to use
+    # OPENGL_ANY_PROFILE
+    # See:
+    # * http://www.glfw.org/docs/latest/window.html
+    # * https://github.com/JuliaGL/GLAbstraction.jl/issues/24
+    const _contexthints = [(GLFW.CONTEXT_VERSION_MAJOR, 3),
+                           (GLFW.CONTEXT_VERSION_MINOR, 0),
+                           (GLFW.OPENGL_FORWARD_COMPAT, GL_TRUE),
+                           (GLFW.OPENGL_PROFILE, GLFW.OPENGL_ANY_PROFILE)]
+else
+    const _contexthints = [(GLFW.CONTEXT_VERSION_MAJOR, 3),
+                           (GLFW.CONTEXT_VERSION_MINOR, 3),
+                           (GLFW.OPENGL_FORWARD_COMPAT, GL_TRUE),
+                           (GLFW.OPENGL_PROFILE, GLFW.OPENGL_CORE_PROFILE)]
+end
 
-function createwindow(name::AbstractString, w, h; debugging = false, windowhints=[(GLFW.SAMPLES, 4)])
+function createwindow(name::AbstractString, w, h; debugging = false,
+                      windowhints=[(GLFW.SAMPLES, 4)],
+                      contexthints=_contexthints)
 
     for elem in windowhints
+        GLFW.WindowHint(elem...)
+    end
+    for elem in contexthints
         GLFW.WindowHint(elem...)
     end
     @osx_only begin
@@ -371,11 +396,6 @@ function createwindow(name::AbstractString, w, h; debugging = false, windowhints
             debugging = false
         end
     end
-
-    GLFW.WindowHint(GLFW.CONTEXT_VERSION_MAJOR, 3)
-    GLFW.WindowHint(GLFW.CONTEXT_VERSION_MINOR, 3)
-    GLFW.WindowHint(GLFW.OPENGL_FORWARD_COMPAT, GL_TRUE)
-    GLFW.WindowHint(GLFW.OPENGL_PROFILE, GLFW.OPENGL_CORE_PROFILE)
 
     GLFW.WindowHint(GLFW.OPENGL_DEBUG_CONTEXT, Cint(debugging))
     window = GLFW.CreateWindow(w, h, name)
