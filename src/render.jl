@@ -37,13 +37,26 @@ function pollwindow(window)
        sleep(1/60)
     end
 end
+
+# nanoseconds between each frame
+const _ns_per_frame = round(UInt64, 1e9 / parse(Float64, get(ENV, "GLVISUALIZE_FPS", "60")))
+
 """
 Blocking renderloop
 """
 function renderloop(window::Screen)
+    nw = time_ns()
     while isopen(window)
         render_frame(window)
         GLFW.PollEvents()
+
+        # if we've gone too fast, sleep for the remaining time
+        ns_diff = time_ns() - nw
+        nw += ns_diff
+        if ns_diff < _ns_per_frame
+            secs = (_ns_per_frame - ns_diff) * 1e-9
+            sleep(secs)
+        end
     end
     empty!(window)
     yield()
