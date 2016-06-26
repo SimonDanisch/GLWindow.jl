@@ -39,7 +39,7 @@ function pollwindow(window)
 end
 
 # nanoseconds between each frame
-const _ns_per_frame = 1e9 / 30
+const _ns_per_frame = round(UInt64, 1e9 / parse(Float64, get(ENV, "GLVISUALIZE_FPS", "60")))
 
 """
 Blocking renderloop
