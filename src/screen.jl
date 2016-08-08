@@ -13,7 +13,7 @@ function openglerrorcallback(
         |
         | OpenGL Error!
         | source: $(GLENUM(source).name) :: type: $(GLENUM(typ).name)
-        |  $(ascii(bytestring(message, length)))
+        |  $(ascii(Compat.String(message, length)))
         |________________________________________________________________
     """
     output = typ == GL_DEBUG_TYPE_ERROR ? error : info
@@ -27,6 +27,7 @@ global const _openglerrorcallback = cfunction(
 )
 
 
+
 """
 Screen constructor cnstructing a new screen from a parant screen.
 """
@@ -35,51 +36,33 @@ function Screen(
         name = gensym(parent.name),
         area = parent.area,
         children::Vector{Screen} = Screen[],
-        inputs::Dict{Symbol, Any} = parent.inputs,
-        renderlist::Tuple = (),
+        inputs::Dict{Symbol, Any} = copy(parent.inputs),
+        renderlist::Vector = RenderObject[],
         hidden::Bool = parent.hidden,
         glcontext::GLContext = parent.glcontext,
+        cameras = Dict{Symbol, Any}(),
         position = Vec3f0(2),
         lookat = Vec3f0(0),
         color = RGBA{Float32}(1,1,1,1)
+    )
+    screen = Screen(name,
+        area, parent, children, inputs,
+        renderlist, hidden, color,
+        cameras, glcontext
     )
     pintersect = const_lift(x->intersect(zeroposition(value(parent.area)), x), area)
     relative_mousepos = const_lift(inputs[:mouseposition]) do mpos
         Point{2, Float64}(mpos[1]-value(pintersect).x, mpos[2]-value(pintersect).y)
     end
     #checks if mouse is inside screen and not inside any children
-
-    insidescreen = droprepeats(const_lift(relative_mousepos) do mpos
-        for screen in children
-            # if inside any children, it's not inside screen
-            isinside(value(screen.area), mpos...) && return false
-        end
-        (mpos[1] < 0 || mpos[2] < 0) && return false
-        mpos[1] > value(pintersect).w && return false
-        mpos[2] > value(pintersect).h && return false
-        true
-    end)
-    # creates signals for the camera, which are only active if mouse is inside screen
-    camera_input = merge(inputs, Dict(
-        :mouseposition 	=> filterwhen(insidescreen, Vec(0.0, 0.0), relative_mousepos),
-        :scroll 		=> filterwhen(insidescreen, 0.0, inputs[:scroll]),
-        :window_area 	=> area
-    ))
-    new_input = merge(inputs, Dict(
+    insidescreen = droprepeats(const_lift(isinside, screen, relative_mousepos))
+    merge!(screen.inputs, Dict(
         :mouseinside 	=> insidescreen,
         :mouseposition 	=> relative_mousepos,
-        :scroll 		=> inputs[:scroll],
         :window_area 	=> area
     ))
     # creates cameras for the sceen with the new inputs
-    ocamera = OrthographicPixelCamera(camera_input)
-    pcamera = PerspectiveCamera(camera_input, position, lookat)
-    screen  = Screen(name,
-        area, parent, children, new_input,
-        renderlist, hidden, color,
-        Dict{Symbol, Any}(:perspective=>pcamera, :orthographic_pixel=>ocamera),
-        glcontext
-    )
+
     push!(parent.children, screen)
     screen
 end
@@ -199,7 +182,7 @@ function create_glcontext(
         GLFW.WindowHint(wh...)
     end
 
-    @osx_only begin
+    @static if is_apple()
         if debugging
             warn("OpenGL debug message callback not available on osx")
             debugging = false
@@ -207,7 +190,7 @@ function create_glcontext(
     end
     GLFW.WindowHint(GLFW.OPENGL_DEBUG_CONTEXT, Cint(debugging))
 
-    window = GLFW.CreateWindow(resolution..., utf8(name))
+    window = GLFW.CreateWindow(resolution..., Compat.String(name))
     GLFW.MakeContextCurrent(window)
 
     debugging && glDebugMessageCallbackARB(_openglerrorcallback, C_NULL)
@@ -267,19 +250,17 @@ function Screen(name = "GLWindow";
     signal_dict[:mouse2id] = Signal(SelectionID{Int}(-1, -1))
     # TODO: free when context is freed. We don't have a good abstraction of a gl context yet, though
     # (It could be shared, so it does not map directly to one screen)
-    preserve(map(signal_dict[:window_open]) do open
-        if !open
-            GLAbstraction.empty_shader_cache!()
-        end
-        nothing
-    end)
-
     screen = Screen(Symbol(name),
         window_area, Screen[], signal_dict,
-        (), false, color,
+        RenderObject[], false, color,
         Dict{Symbol, Any}(),
-        GLContext(window, GLFramebuffer(framebuffer_size))
+        GLContext(window)
     )
+    screen.inputs[:mouseinside] = droprepeats(
+        const_lift(isinside, screen, screen.inputs[:mouseposition])
+    )
+    GLFW.SwapInterval(0) # deactivating vsync seems to make everything quite a bit smoother
+    #Reactive.stop()
     screen
 end
 
@@ -288,8 +269,9 @@ Function that creates a screenshot from `window` and saves it to `path`.
 You can choose the channel of the framebuffer, which is usually:
 `color`, `depth` and `objectid`
 """
-screenshot(window; path="screenshot.png", channel=:color) =
-   save(path, screenbuffer(window, channel), true)
+function screenshot(window; path="screenshot.png", channel=:color)
+    save(path, screenbuffer(window, channel), true)
+end
 
 """
 Returns the contents of the framebuffer of `window` as a Julia Array.
@@ -297,11 +279,20 @@ You can choose the channel of the framebuffer, which is usually:
 `color`, `depth` and `objectid`
 """
 function screenbuffer(window, channel=:color)
-    fb = framebuffer(window)
-    channels = fieldnames(fb)[2:end]
-    if channel in channels
-        img = gpu_data(getfield(fb, channel))[window.area.value]
+    if channel == :color
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        a = window.area.value
+        img = Array(BGR{U8}, a.w, a.h)
+        glReadPixels(a.x-1, a.y-1, a.w, a.h, GL_BGR, GL_UNSIGNED_BYTE, img)
         return rotl90(img)
+    elseif channel == :id
+        opaque_pass, tansp_pass, color_pass, fxaa_pass = window.renderpasses
+        id_buff = gpu_data(opaque_pass.target.attachments[4][1])
+        maxi = maximum(id_buff)
+        return map(id_buff) do id
+            x = id ./ maxi
+            RGB{U8}(x[1], 0, x[2])
+        end
     end
     error("Channel $channel does not exist. Only these channels are available: $channels")
 end
@@ -310,8 +301,7 @@ end
 
 widths(s::Screen) = widths(value(s.area))
 ishidden(s::Screen) = s.hidden
-framebuffer(s::Screen) = s.glcontext.framebuffer
-nativewindow(s::Screen) = s.glcontext.window
+nativewindow(s::Screen) = s.glcontext.context
 
 """
 Check if a Screen is opened.
@@ -320,7 +310,14 @@ function Base.isopen(window::Screen)
     isopen(nativewindow(window))
 end
 function Base.isopen(window::GLFW.Window)
+    window.handle == C_NULL && return false
     !GLFW.WindowShouldClose(window)
+end
+"""
+Swap the framebuffers on the Screen.
+"""
+function makecontextcurrent(window::Screen)
+    GLFW.MakeContextCurrent(nativewindow(window))
 end
 """
 Swap the framebuffers on the Screen.
@@ -349,12 +346,70 @@ end
 Empties the content of the renderlist
 """
 function Base.empty!(s::Screen)
-    s.renderlist = ()
+    empty!(s.renderlist)
+    empty!(s.opaque)
+    empty!(s.transparent)
+    for c in s.children
+        empty!(c)
+    end
+    empty!(s.children)
+    nothing
 end
 
 """
 returns a copy of the renderlist
 """
 function GLAbstraction.renderlist(s::Screen)
-    vcat(s.renderlist...)
+    copy(s.renderlist)
+end
+function destroy!(screen::Screen)
+    empty!(screen)
+    nw = nativewindow(screen)
+    if nw.handle != C_NULL
+        GLFW.DestroyWindow(nw)
+        nw.handle = C_NULL
+    end
+end
+get_id(x::Integer) = x
+get_id(x::RenderObject) = x.id
+function delete_robj!(list, robj)
+    for (i, id) in enumerate(list)
+        if get_id(id) == robj.id
+            splice!(list, i)
+            return true, i
+        end
+    end
+    false, 0
+end
+function delete_index(list, index)
+    newlist = Int[]
+    for (i, ref_i) in enumerate(list)
+        if ref_i < i
+            push!(newlist, ref_i)
+        elseif ref_i > index
+            push!(newlist, ref_i-1)
+        else
+            continue # skipp ==
+        end
+    end
+    newlist
+end
+function Base.delete!(screen::Screen, robj::RenderObject)
+    deleted, i = delete_robj!(screen.renderlist, robj)
+    if deleted
+        for (k,v) in screen.camera2robj
+            delete_robj!(v, robj)
+        end
+        screen.transparent = delete_index(screen.transparent, i)
+        screen.opaque = delete_index(screen.opaque, i)
+    end
+    deleted
+end
+
+function GLAbstraction.robj_from_camera(window, camera)
+    robj_list = get(window.camera2robj, camera, ())
+    isempty(robj_list) && return RenderObject[]
+    return filter(window.renderlist) do robj
+        robj.id in robj_list
+    end
 end
