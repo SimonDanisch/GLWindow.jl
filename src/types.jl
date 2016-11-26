@@ -159,7 +159,7 @@ function MonitorProperties(monitor::Monitor)
 end
 
 type GLContext
-    window::GLFW.Window
+    window
     framebuffer::GLFramebuffer
     visible::Bool
     cache::Dict
