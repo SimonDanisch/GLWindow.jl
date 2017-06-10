@@ -95,19 +95,19 @@ Selection of random objects on the screen is realized by rendering an
 object id + plus an arbitrary index into the framebuffer.
 The index can be used for e.g. instanced geometries.
 """
-immutable SelectionID{T <: Integer} <: FixedVectorNoTuple{2, T}
+immutable SelectionID{T <: Integer} <: FieldVector{T}
     id::T
     index::T
-    function SelectionID(args::NTuple{2, T})
-        new{T}(args[1], args[2])
-    end
+    # function SelectionID(args::NTuple{2, T})
+    #     new{T}(args[1], args[2])
+    # end
 end
 
 begin
 global push_selectionqueries!
 
-const selection_data = Array(SelectionID{UInt16}, 1, 1)
-const old_mouse_position = Array(Vec{2, Float64}, 1)
+const selection_data = Array{SelectionID{UInt16}, 2}(1, 1)
+const old_mouse_position = Vector{Vec{2, Float64}}(1)
 
 function push_selectionqueries!(screen)
     mouse_position   = value(mouseposition(screen))
