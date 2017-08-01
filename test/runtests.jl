@@ -24,5 +24,3 @@ using GLWindow
     GLWindow.poll_glfw()
     sleep(0.001)
 end
-w = Screen(fullscreen = true)
-# GLWindow.make_fullscreen!(w)
