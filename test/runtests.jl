@@ -18,9 +18,3 @@ poll_glfw()
 
 end
 println("success")
-
-using GLWindow
-@async while true
-    GLWindow.poll_glfw()
-    sleep(0.001)
-end
