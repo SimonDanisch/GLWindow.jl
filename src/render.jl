@@ -30,9 +30,12 @@ function poll_reactive()
     # run_till_now blocks when message queue is empty!
     Base.n_avail(Reactive._messages) > 0 && Reactive.run_till_now()
 end
-function renderloop(window::Screen, framerate = 1//60)
+function renderloop(window::Screen; framerate = 1/60,
+    prerender = () -> nothing)
     while isopen(window)
         tic()
+        prerender()
+
         render_frame(window)
         swapbuffers(window)
         poll_glfw()
@@ -45,23 +48,22 @@ end
 
 import GLWindow: poll_reactive, sleep_pessimistic
 
-function waiting_renderloop(screen, framerate = 1//60)
-    Reactive.stop()
+function waiting_renderloop(screen; framerate = 1/60,
+    prerender = () -> nothing)
+
     while isopen(screen)
         tic()
         poll_glfw() # GLFW poll
+        prerender()
         if Base.n_avail(Reactive._messages) > 0
-            poll_reactive() # reactive poll
-            poll_reactive() # two times for secondary signals
+            yield()
             render_frame(screen)
             swapbuffers(screen)
-            yield() # yield in timings? Seems fair
         end
         t = toq()
         sleep_pessimistic((1/60) - t)
     end
     destroy!(screen)
-    @async Reactive.run() #turn reactive back on
     return
 end
 
