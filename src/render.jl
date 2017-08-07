@@ -19,11 +19,12 @@ Sleep is pretty imprecise. E.g. anything under `0.001s` is not guaranteed to wak
 up before `0.001s`. So this timer is pessimistic in the way, that it will never
 sleep more than `time`.
 """
-@inline function sleep_pessimistic(time)
-    while time >= 0.001
-        tic()
+@inline function sleep_pessimistic(sleep_time)
+    st = convert(Float64,sleep_time)
+    while st > 0.0015
+        t = time()
         sleep(0.001) # sleep for the minimal amount of time
-        time -= toq()
+        st -= (time()-t)
     end
 end
 function poll_reactive()
@@ -33,14 +34,14 @@ end
 function renderloop(window::Screen; framerate = 1/60,
     prerender = () -> nothing)
     while isopen(window)
-        tic()
+        t = time()
         prerender()
 
         render_frame(window)
         swapbuffers(window)
         poll_glfw()
         yield()
-        sleep_pessimistic(framerate - toq()) #
+        sleep_pessimistic(framerate - (time() - t)) #
     end
     destroy!(window)
     return
@@ -52,16 +53,18 @@ function waiting_renderloop(screen; framerate = 1/60,
     prerender = () -> nothing)
 
     while isopen(screen)
-        tic()
+        t = time()
         poll_glfw() # GLFW poll
         prerender()
         if Base.n_avail(Reactive._messages) > 0
-            yield()
+            while isready(Reactive._messages)
+                yield()
+            end
             render_frame(screen)
             swapbuffers(screen)
         end
-        t = toq()
-        sleep_pessimistic((1/60) - t)
+        t = time() - t
+        sleep_pessimistic(framerate - t)
     end
     destroy!(screen)
     return
