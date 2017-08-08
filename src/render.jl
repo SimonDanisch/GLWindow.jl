@@ -20,23 +20,26 @@ up before `0.001s`. So this timer is pessimistic in the way, that it will never
 sleep more than `time`.
 """
 @inline function sleep_pessimistic(sleep_time)
-    st = convert(Float64,sleep_time)
-    while st > 0.0015
-        t = time()
+    st = convert(Float64,sleep_time) - 0.002
+    start_time = time()
+    while (time() - start_time) < st
         sleep(0.001) # sleep for the minimal amount of time
-        st -= (time()-t)
     end
 end
-function poll_reactive()
-    # run_till_now blocks when message queue is empty!
-    Base.n_avail(Reactive._messages) > 0 && Reactive.run_till_now()
+function reactive_run_till_now()
+    max_yield = Base.n_avail(Reactive._messages) * 2
+    for i=1:max_yield
+        if !isready(Reactive._messages)
+            break
+        end
+        yield()
+    end
 end
 function renderloop(window::Screen; framerate = 1/60,
     prerender = () -> nothing)
     while isopen(window)
         t = time()
         prerender()
-
         render_frame(window)
         swapbuffers(window)
         poll_glfw()
@@ -47,7 +50,6 @@ function renderloop(window::Screen; framerate = 1/60,
     return
 end
 
-import GLWindow: poll_reactive, sleep_pessimistic
 
 function waiting_renderloop(screen; framerate = 1/60,
     prerender = () -> nothing)
@@ -57,9 +59,7 @@ function waiting_renderloop(screen; framerate = 1/60,
         poll_glfw() # GLFW poll
         prerender()
         if Base.n_avail(Reactive._messages) > 0
-            while isready(Reactive._messages)
-                yield()
-            end
+            reactive_run_till_now()
             render_frame(screen)
             swapbuffers(screen)
         end
