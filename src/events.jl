@@ -109,7 +109,7 @@ global push_selectionqueries!
 const selection_data = Matrix{SelectionID{UInt16}}(1, 1)
 const old_mouse_position = Vector{Vec{2, Float64}}(1)
 
-function push_selectionqueries!(screen)
+function push_selectionqueries!(screen::Screen)
     mouse_position   = value(mouseposition(screen))
     selection_signal = mouse2id(screen)
     window_size      = widths(screen)
