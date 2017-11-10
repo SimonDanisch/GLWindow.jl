@@ -306,6 +306,9 @@ function Screen(name = "GLWindow";
     signal_dict[:window_area] = window_area
     # seems to be necessary to set this as early as possible
     fb_size = value(framebuffer_size)
+    @show GLFW.GetFramebufferSize(window)
+    @show fb_size
+
     glViewport(0, 0, fb_size...)
 
     # GLFW uses different coordinates from OpenGL, and on osx, the coordinates
