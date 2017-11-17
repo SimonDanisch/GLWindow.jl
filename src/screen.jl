@@ -296,13 +296,13 @@ function Screen(name = "GLWindow";
     @materialize framebuffer_size, cursor_position = signal_dict
 
     # make sure we get newest updates from glfw and reactive!
-    poll_glfw()
     push!(framebuffer_size, Vec(GLFW.GetFramebufferSize(window)))
-    reactive_run_till_now()
+
     window_area = map(SimpleRectangle,
         Signal(Vec(0,0)),
         framebuffer_size
     )
+
     signal_dict[:window_area] = window_area
     # seems to be necessary to set this as early as possible
     fb_size = value(framebuffer_size)
