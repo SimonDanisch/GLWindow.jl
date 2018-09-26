@@ -15,7 +15,7 @@ This is why there is also framebuffer_size.
 returns `Signal{Vec{2,Int}}`
 [GLFW Docs](http://www.glfw.org/docs/latest/group__window.html#gaaca1c2715759d03da9834eac19323d4a)
 """
-function window_size(window, s::Signal{Vec{2,Int}}=Signal(Vec{2,Int}(GLFW.GetWindowSize(window))))
+function window_size(window, s::Signal{Vec{2,Int}}=Signal(Vec{2,Int}(GLFW.GetWindowSize(window)...)))
     GLFW.SetWindowSizeCallback(window, (window, w::Cint, h::Cint,) -> begin
         push!(s, Vec{2,Int}(w, h))
     end)
@@ -26,7 +26,7 @@ Size of window in pixel.
 returns `Signal{Vec{2,Int}}`
 [GLFW Docs](http://www.glfw.org/docs/latest/group__window.html#ga311bb32e578aa240b6464af494debffc)
 """
-function framebuffer_size(window, s::Signal{Vec{2, Int}}=Signal(Vec{2, Int}(GLFW.GetFramebufferSize(window))))
+function framebuffer_size(window, s::Signal{Vec{2, Int}}=Signal(Vec{2, Int}(GLFW.GetFramebufferSize(window)...)))
     GLFW.SetFramebufferSizeCallback(window, (window, w::Cint, h::Cint) -> begin
         push!(s, Vec(Int(w), Int(h)))
     end)
