@@ -5,7 +5,8 @@ function is_ci()
 end
 
 using GLWindow
-using Base.Test
+using Test
+using GLFW
 
 if !is_ci() # only do test if not CI... this is for automated testing environments which fail for OpenGL stuff, but I'd like to test if at least including works
 

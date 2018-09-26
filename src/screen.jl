@@ -6,7 +6,7 @@ function openglerrorcallback(
         source::GLenum, typ::GLenum,
         id::GLuint, severity::GLenum,
         length::GLsizei, message::Ptr{GLchar},
-        userParam::Ptr{Void}
+        userParam::Ptr{Nothing}
     )
     errormessage = """
          ________________________________________________________________
@@ -21,9 +21,9 @@ function openglerrorcallback(
     nothing
 end
 
-global const _openglerrorcallback = cfunction(
-    openglerrorcallback, Void,
-    (GLenum, GLenum,GLuint, GLenum, GLsizei, Ptr{GLchar}, Ptr{Void})
+global const _openglerrorcallback = @cfunction(
+    openglerrorcallback, Nothing,
+    (GLenum, GLenum,GLuint, GLenum, GLsizei, Ptr{GLchar}, Ptr{Nothing})
 )
 
 
@@ -78,7 +78,7 @@ function scaling_factor(window::Vec{2, Int}, fb::Vec{2, Int})
 end
 function scaling_factor(nw)
     w, fb = GLFW.GetWindowSize(nw), GLFW.GetFramebufferSize(nw)
-    scaling_factor(Vec{2, Int}(w), Vec{2, Int}(fb))
+    scaling_factor(Vec{2, Int}(w...), Vec{2, Int}(fb...))
 end
 
 """
@@ -203,7 +203,7 @@ function create_glcontext(
         GLFW.WindowHint(wh[1], wh[2])
     end
 
-    @static if is_apple()
+    @static if Sys.isapple()
         if debugging
             warn("OpenGL debug message callback not available on osx")
             debugging = false
@@ -579,12 +579,13 @@ function Base.push!(screen::Screen, robj::RenderObject{Pre}) where Pre
     index = findfirst(getfield(screen, sym)) do renderlist
         prerendertype(eltype(renderlist)) == Pre
     end
-    if index == 0
+    if (index == 0) || (index == nothing)
         # add new specialised renderlist, if none found
         setfield!(screen, sym, (getfield(screen, sym)..., RenderObject{Pre}[]))
         index = length(getfield(screen, sym))
     end
     # only add to renderlist if not already in there
+    tmp = getfield(screen, sym)[index]
     in(robj, getfield(screen, sym)[index]) || push!(getfield(screen, sym)[index], robj)
     nothing
 end

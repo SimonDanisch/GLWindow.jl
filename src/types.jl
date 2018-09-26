@@ -163,7 +163,7 @@ function MonitorProperties(monitor::Monitor)
     position = Vec{2, Int}(GLFW.GetMonitorPos(monitor)...)
     physicalsize = Vec{2, Int}(GLFW.GetMonitorPhysicalSize(monitor)...)
     videomode = GLFW.GetVideoMode(monitor)
-    sfactor = is_apple() ? 2.0 : 1.0
+    sfactor = Sys.isapple() ? 2.0 : 1.0
     dpi = Vec(videomode.width * 25.4, videomode.height * 25.4) * sfactor ./ Vec{2, Float64}(physicalsize)
     videomode_supported = GLFW.GetVideoModes(monitor)
 
@@ -210,7 +210,7 @@ mutable struct Screen
     function Screen(
             name        ::Symbol,
             area        ::Signal{SimpleRectangle{Int}},
-            parent      ::Union{Screen, Void},
+            parent      ::Union{Screen, Nothing},
             children    ::Vector{Screen},
             inputs      ::Dict{Symbol, Any},
             renderlist  ::Tuple,
